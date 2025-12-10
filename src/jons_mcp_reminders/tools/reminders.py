@@ -23,7 +23,7 @@ async def get_reminders(
     due_after: datetime | None = None,
     limit: int | None = None,
     offset: int = 0,
-) -> list[Reminder]:
+) -> dict[str, list[Reminder]]:
     """Get reminders with optional filters.
 
     Args:
@@ -45,7 +45,9 @@ async def get_reminders(
     # Apply pagination
     paginated = _paginate(reminders, offset, limit)
 
-    return [Reminder(**data) for data in paginated]
+    # Wrap in dict to ensure FastMCP always returns a TextContent
+    # (empty lists cause "No result received" in Claude Desktop)
+    return {"reminders": [Reminder(**data) for data in paginated]}
 
 
 async def get_reminder(reminder_id: str) -> Reminder:

@@ -73,7 +73,8 @@ async def test_list():
 @pytest.mark.integration
 async def test_list_reminder_lists(test_list):
     """Test that list_reminder_lists returns the test list."""
-    lists = await list_reminder_lists()
+    result = await list_reminder_lists()
+    lists = result["lists"]
 
     assert len(lists) > 0
     list_ids = [lst.id for lst in lists]
@@ -215,11 +216,13 @@ async def test_get_reminders_with_filters(test_list):
     await complete_reminder(reminder3.id)
 
     # Get incomplete reminders from test list
-    incomplete = await get_reminders(list_id=test_list.id, include_completed=False)
+    result = await get_reminders(list_id=test_list.id, include_completed=False)
+    incomplete = result["reminders"]
     assert len(incomplete) >= 2
 
     # Get all reminders including completed
-    all_reminders = await get_reminders(list_id=test_list.id, include_completed=True)
+    result = await get_reminders(list_id=test_list.id, include_completed=True)
+    all_reminders = result["reminders"]
     assert len(all_reminders) >= 3
 
 
@@ -227,7 +230,8 @@ async def test_get_reminders_with_filters(test_list):
 async def test_batch_add_reminders(test_list):
     """Test adding multiple reminders at once."""
     items = ["Batch Item 1", "Batch Item 2", "Batch Item 3"]
-    created = await add_reminders(test_list.id, items)
+    result = await add_reminders(test_list.id, items)
+    created = result["reminders"]
 
     assert len(created) == 3
     titles = [r.title for r in created]
@@ -276,12 +280,14 @@ async def test_search_reminders(test_list):
     )
 
     # Search by title
-    by_title = await search_reminders("Searchable", list_id=test_list.id)
+    result = await search_reminders("Searchable", list_id=test_list.id)
+    by_title = result["reminders"]
     assert len(by_title) >= 1
     assert "Searchable" in by_title[0].title
 
     # Search by notes
-    by_notes = await search_reminders("FINDME", list_id=test_list.id)
+    result = await search_reminders("FINDME", list_id=test_list.id)
+    by_notes = result["reminders"]
     assert len(by_notes) >= 1
 
 
@@ -293,11 +299,13 @@ async def test_pagination(test_list):
     await add_reminders(test_list.id, items)
 
     # Get first 2
-    first_batch = await get_reminders(list_id=test_list.id, limit=2, offset=0)
+    result = await get_reminders(list_id=test_list.id, limit=2, offset=0)
+    first_batch = result["reminders"]
     assert len(first_batch) == 2
 
     # Get next 2
-    second_batch = await get_reminders(list_id=test_list.id, limit=2, offset=2)
+    result = await get_reminders(list_id=test_list.id, limit=2, offset=2)
+    second_batch = result["reminders"]
     assert len(second_batch) == 2
 
     # Verify different items

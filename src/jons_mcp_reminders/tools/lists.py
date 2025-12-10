@@ -4,7 +4,7 @@ from ..models import ReminderList
 from ..store import ReminderStore
 
 
-async def list_reminder_lists() -> list[ReminderList]:
+async def list_reminder_lists() -> dict[str, list[ReminderList]]:
     """Get all reminder lists.
 
     Returns a list of all reminder lists (calendars) available in the
@@ -13,7 +13,9 @@ async def list_reminder_lists() -> list[ReminderList]:
     """
     store = ReminderStore.get_instance()
     lists = await ReminderStore.run_eventkit(store.get_lists_sync)
-    return [ReminderList(**data) for data in lists]
+    # Wrap in dict to ensure FastMCP always returns a TextContent
+    # (empty lists cause "No result received" in Claude Desktop)
+    return {"lists": [ReminderList(**data) for data in lists]}
 
 
 async def get_reminder_list(list_id: str) -> ReminderList:

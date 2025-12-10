@@ -81,7 +81,7 @@ async def delete_reminders(reminder_ids: list[str]) -> BatchResult:
 async def add_reminders(
     list_id: str | None,
     items: list[str],
-) -> list[Reminder]:
+) -> dict[str, list[Reminder]]:
     """Quick-add multiple reminders by title.
 
     Creates multiple reminders with just titles, all in the same list.
@@ -92,7 +92,7 @@ async def add_reminders(
         items: List of reminder titles to create.
 
     Returns:
-        List of created Reminder objects for successful items.
+        Dict with 'reminders' key containing created Reminder objects.
         Failed items are silently skipped.
     """
     store = ReminderStore.get_instance()
@@ -115,7 +115,9 @@ async def add_reminders(
             # Skip failed items
             pass
 
-    return created
+    # Wrap in dict to ensure FastMCP always returns a TextContent
+    # (empty lists cause "No result received" in Claude Desktop)
+    return {"reminders": created}
 
 
 __all__ = [

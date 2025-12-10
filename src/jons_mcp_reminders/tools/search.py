@@ -21,7 +21,7 @@ async def search_reminders(
     include_completed: bool = False,
     limit: int | None = None,
     offset: int = 0,
-) -> list[Reminder]:
+) -> dict[str, list[Reminder]]:
     """Search reminders by title or notes.
 
     Searches for reminders where the title OR notes contain the query
@@ -61,7 +61,9 @@ async def search_reminders(
     # Apply pagination
     paginated = _paginate(matching, offset, limit)
 
-    return [Reminder(**data) for data in paginated]
+    # Wrap in dict to ensure FastMCP always returns a TextContent
+    # (empty lists cause "No result received" in Claude Desktop)
+    return {"reminders": [Reminder(**data) for data in paginated]}
 
 
 __all__ = ["search_reminders"]
