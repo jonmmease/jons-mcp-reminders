@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from src.jons_mcp_reminders.exceptions import AccessDeniedError, NotFoundError
-from src.jons_mcp_reminders.models import Priority
+from src.jons_mcp_reminders.models import LocationTrigger, Priority, Proximity
 from src.jons_mcp_reminders.store import ReminderStore
 from src.jons_mcp_reminders.tools.batch import add_reminders, complete_reminders, delete_reminders
 from src.jons_mcp_reminders.tools.lists import (
@@ -312,3 +312,155 @@ async def test_pagination(test_list):
     first_ids = {r.id for r in first_batch}
     second_ids = {r.id for r in second_batch}
     assert first_ids.isdisjoint(second_ids)
+
+
+# Location-based reminder tests
+
+
+@pytest.mark.integration
+async def test_create_reminder_with_location(test_list):
+    """Test creating a reminder with a location trigger."""
+    location = LocationTrigger(
+        title="Test Location",
+        latitude=37.7749,
+        longitude=-122.4194,
+        radius=150.0,
+        proximity=Proximity.ENTER,
+    )
+
+    reminder = await create_reminder(
+        title="Location Test Reminder",
+        list_id=test_list.id,
+        location=location,
+    )
+
+    assert reminder.title == "Location Test Reminder"
+    assert reminder.location is not None
+    assert reminder.location.title == "Test Location"
+    assert abs(reminder.location.latitude - 37.7749) < 0.0001
+    assert abs(reminder.location.longitude - (-122.4194)) < 0.0001
+    assert reminder.location.radius == pytest.approx(150.0, abs=1.0)
+    assert reminder.location.proximity == Proximity.ENTER
+
+
+@pytest.mark.integration
+async def test_create_reminder_with_leave_proximity(test_list):
+    """Test creating a reminder with leave proximity."""
+    location = LocationTrigger(
+        title="Leave Location",
+        latitude=40.7128,
+        longitude=-74.0060,
+        proximity=Proximity.LEAVE,
+    )
+
+    reminder = await create_reminder(
+        title="Leave Proximity Test",
+        list_id=test_list.id,
+        location=location,
+    )
+
+    assert reminder.location is not None
+    assert reminder.location.proximity == Proximity.LEAVE
+
+
+@pytest.mark.integration
+async def test_update_reminder_add_location(test_list):
+    """Test adding a location to an existing reminder."""
+    # Create reminder without location
+    reminder = await create_reminder(
+        title="Add Location Test",
+        list_id=test_list.id,
+    )
+    assert reminder.location is None
+
+    # Add location via update
+    location = LocationTrigger(
+        title="Added Location",
+        latitude=51.5074,
+        longitude=-0.1278,
+        radius=200.0,
+    )
+
+    updated = await update_reminder(reminder.id, location=location)
+
+    assert updated.location is not None
+    assert updated.location.title == "Added Location"
+    assert abs(updated.location.latitude - 51.5074) < 0.0001
+
+
+@pytest.mark.integration
+async def test_update_reminder_change_location(test_list):
+    """Test changing a reminder's location."""
+    location1 = LocationTrigger(
+        title="First Location",
+        latitude=37.0,
+        longitude=-122.0,
+    )
+
+    reminder = await create_reminder(
+        title="Change Location Test",
+        list_id=test_list.id,
+        location=location1,
+    )
+    assert reminder.location.title == "First Location"
+
+    # Change to new location
+    location2 = LocationTrigger(
+        title="Second Location",
+        latitude=38.0,
+        longitude=-123.0,
+        radius=300.0,
+    )
+
+    updated = await update_reminder(reminder.id, location=location2)
+
+    assert updated.location is not None
+    assert updated.location.title == "Second Location"
+    assert abs(updated.location.latitude - 38.0) < 0.0001
+
+
+@pytest.mark.integration
+async def test_update_reminder_clear_location(test_list):
+    """Test removing a location from a reminder."""
+    location = LocationTrigger(
+        title="To Be Removed",
+        latitude=35.6762,
+        longitude=139.6503,
+    )
+
+    reminder = await create_reminder(
+        title="Clear Location Test",
+        list_id=test_list.id,
+        location=location,
+    )
+    assert reminder.location is not None
+
+    # Clear the location
+    updated = await update_reminder(reminder.id, clear_location=True)
+    assert updated.location is None
+
+
+@pytest.mark.integration
+async def test_get_reminder_includes_location(test_list):
+    """Test that get_reminder returns location data."""
+    location = LocationTrigger(
+        title="Get Test Location",
+        latitude=48.8566,
+        longitude=2.3522,
+        radius=250.0,
+        proximity=Proximity.ENTER,
+    )
+
+    reminder = await create_reminder(
+        title="Get Location Test",
+        list_id=test_list.id,
+        location=location,
+    )
+
+    # Fetch fresh
+    fetched = await get_reminder(reminder.id)
+
+    assert fetched.location is not None
+    assert fetched.location.title == "Get Test Location"
+    assert abs(fetched.location.latitude - 48.8566) < 0.0001
+    assert fetched.location.radius == pytest.approx(250.0, abs=1.0)

@@ -81,8 +81,8 @@ Replace `/path/to/jons-mcp-reminders` with the actual path to this repository.
 |------|-------------|
 | `get_reminders` | Get reminders with filters (list, completion, due date) |
 | `get_reminder` | Get single reminder by ID |
-| `create_reminder` | Create with title, notes, URL, due date, priority |
-| `update_reminder` | Update any reminder fields |
+| `create_reminder` | Create with title, notes, URL, due date, priority, location |
+| `update_reminder` | Update any reminder fields including location |
 | `complete_reminder` | Toggle completion status |
 | `delete_reminder` | Delete a reminder |
 | `move_reminder` | Move reminder to different list |
@@ -109,6 +109,41 @@ Replace `/path/to/jons-mcp-reminders` with the actual path to this repository.
 | HIGH | 1 | !!! |
 | MEDIUM | 5 | !! |
 | LOW | 9 | ! |
+
+## Location-Based Reminders
+
+You can create reminders that trigger based on arriving at or leaving a location. The `create_reminder` and `update_reminder` tools accept a `location` parameter with the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Display name for the location (e.g., "Home", "Office") |
+| `latitude` | float | Latitude coordinate (-90 to 90) |
+| `longitude` | float | Longitude coordinate (-180 to 180) |
+| `radius` | float | Geofence radius in meters (default: 100, max: 10000) |
+| `proximity` | string | When to trigger: `"enter"` (arriving) or `"leave"` (departing) |
+
+### Example: Create reminder with location
+
+```python
+await create_reminder(
+    title="Buy groceries",
+    location={
+        "title": "Whole Foods",
+        "latitude": 37.7749,
+        "longitude": -122.4194,
+        "radius": 100.0,
+        "proximity": "enter"
+    }
+)
+```
+
+### Example: Remove location from reminder
+
+```python
+await update_reminder(reminder_id, clear_location=True)
+```
+
+**Note:** Location-based reminders require Location Services to be enabled on the device for the triggers to activate.
 
 ## Known Limitations
 

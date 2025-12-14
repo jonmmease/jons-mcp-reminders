@@ -1,7 +1,7 @@
 """Pydantic models for Reminders MCP server."""
 
 from datetime import datetime
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -20,6 +20,64 @@ class Priority(IntEnum):
     HIGH = 1
     MEDIUM = 5
     LOW = 9
+
+
+class Proximity(str, Enum):
+    """Trigger proximity for location-based reminders.
+
+    Maps to EKAlarmProximity constants:
+    - ENTER: Trigger when arriving at the location
+    - LEAVE: Trigger when departing from the location
+    """
+
+    ENTER = "enter"
+    LEAVE = "leave"
+
+
+class LocationTrigger(BaseModel):
+    """Location trigger for a reminder alarm.
+
+    Creates a geofence that triggers the reminder when the user
+    enters or leaves the specified location.
+    """
+
+    title: str = Field(description="Display name for the location (e.g., 'Home', 'Work')")
+    latitude: float = Field(description="Latitude coordinate (-90 to 90)")
+    longitude: float = Field(description="Longitude coordinate (-180 to 180)")
+    radius: float = Field(
+        default=100.0,
+        description="Geofence radius in meters (default 100m)",
+    )
+    proximity: Proximity = Field(
+        default=Proximity.ENTER,
+        description="When to trigger: 'enter' or 'leave' the location",
+    )
+
+    @field_validator("latitude")
+    @classmethod
+    def validate_latitude(cls, v: float) -> float:
+        """Validate latitude is in valid range."""
+        if not -90 <= v <= 90:
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @field_validator("longitude")
+    @classmethod
+    def validate_longitude(cls, v: float) -> float:
+        """Validate longitude is in valid range."""
+        if not -180 <= v <= 180:
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
+
+    @field_validator("radius")
+    @classmethod
+    def validate_radius(cls, v: float) -> float:
+        """Validate radius is positive and reasonable."""
+        if v <= 0:
+            raise ValueError("Radius must be positive")
+        if v > 10000:
+            raise ValueError("Radius cannot exceed 10,000 meters (10km)")
+        return v
 
 
 class ReminderList(BaseModel):
@@ -87,6 +145,9 @@ class Reminder(BaseModel):
     last_modified_date: datetime | None = Field(
         default=None, description="When the reminder was last modified"
     )
+    location: LocationTrigger | None = Field(
+        default=None, description="Location-based trigger for this reminder"
+    )
 
 
 class BatchResult(BaseModel):
@@ -124,6 +185,9 @@ class CreateReminderInput(BaseModel):
     due_date: datetime | None = Field(default=None, description="Due date/time")
     start_date: datetime | None = Field(default=None, description="Start date")
     priority: Priority = Field(default=Priority.NONE, description="Priority level")
+    location: LocationTrigger | None = Field(
+        default=None, description="Location trigger for the reminder"
+    )
 
 
 class UpdateReminderInput(BaseModel):

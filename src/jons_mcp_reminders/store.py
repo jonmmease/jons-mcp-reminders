@@ -27,7 +27,9 @@ from .converters import (
     ek_calendar_to_dict,
     ek_reminder_to_dict,
     hex_to_cgcolor,
+    location_trigger_to_ek_alarm,
 )
+from .models import LocationTrigger
 from .exceptions import (
     AccessDeniedError,
     EventKitError,
@@ -371,6 +373,7 @@ class ReminderStore:
         due_date: datetime | None = None,
         start_date: datetime | None = None,
         priority: int = 0,
+        location: LocationTrigger | None = None,
     ) -> dict[str, Any]:
         """Create a new reminder.
 
@@ -382,6 +385,7 @@ class ReminderStore:
             due_date: Optional due date
             start_date: Optional start date
             priority: Priority (0=none, 1=high, 5=medium, 9=low)
+            location: Optional location trigger for geofence-based reminder
 
         Returns:
             Created reminder dict
@@ -416,6 +420,11 @@ class ReminderStore:
         if priority:
             reminder.setPriority_(priority)
 
+        # Location-based alarm
+        if location:
+            alarm = location_trigger_to_ek_alarm(location)
+            reminder.addAlarm_(alarm)
+
         # Save
         error = None
         success = self._store.saveReminder_commit_error_(reminder, True, error)
@@ -434,6 +443,8 @@ class ReminderStore:
         due_date: datetime | None = None,
         start_date: datetime | None = None,
         priority: int | None = None,
+        location: LocationTrigger | None = None,
+        clear_location: bool = False,
     ) -> dict[str, Any]:
         """Update an existing reminder.
 
@@ -445,6 +456,8 @@ class ReminderStore:
             due_date: New due date (optional)
             start_date: New start date (optional)
             priority: New priority (optional)
+            location: New location trigger (optional)
+            clear_location: If True, remove any existing location alarm
 
         Returns:
             Updated reminder dict
@@ -467,6 +480,16 @@ class ReminderStore:
             reminder.setStartDateComponents_(datetime_to_components(start_date))
         if priority is not None:
             reminder.setPriority_(priority)
+
+        # Handle location updates
+        if clear_location:
+            # Remove all location-based alarms
+            self._remove_location_alarms(reminder)
+        elif location is not None:
+            # Remove existing location alarms then add new one
+            self._remove_location_alarms(reminder)
+            alarm = location_trigger_to_ek_alarm(location)
+            reminder.addAlarm_(alarm)
 
         error = None
         success = self._store.saveReminder_commit_error_(reminder, True, error)
@@ -583,6 +606,28 @@ class ReminderStore:
                     return item
 
         raise NotFoundError("Reminder", reminder_id)
+
+    def _remove_location_alarms(self, reminder: EKReminder) -> int:
+        """Remove all location-based alarms from a reminder.
+
+        Args:
+            reminder: EKReminder instance (modified in place)
+
+        Returns:
+            Number of alarms removed
+        """
+        alarms = reminder.alarms()
+        if not alarms:
+            return 0
+
+        removed = 0
+        # Iterate over a copy to safely remove while iterating
+        for alarm in list(alarms):
+            if alarm.structuredLocation() is not None:
+                reminder.removeAlarm_(alarm)
+                removed += 1
+
+        return removed
 
     def _get_writable_source(self) -> Any:
         """Get a writable source for creating new calendars.

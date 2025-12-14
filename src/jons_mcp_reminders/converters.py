@@ -4,10 +4,18 @@ from datetime import datetime
 from typing import Any
 
 from AppKit import NSColor
+from CoreLocation import CLLocation
+from EventKit import (
+    EKAlarm,
+    EKAlarmProximityEnter,
+    EKAlarmProximityLeave,
+    EKAlarmProximityNone,
+    EKStructuredLocation,
+)
 from Foundation import NSURL, NSDate, NSDateComponents
 from Quartz import CGColorGetComponents, CGColorGetNumberOfComponents
 
-from .models import Priority
+from .models import LocationTrigger, Priority, Proximity
 
 # Magic constant for "not set" in NSDateComponents
 NSUndefinedDateComponent = 0x7FFFFFFF  # NSIntegerMax
@@ -168,6 +176,7 @@ def ek_reminder_to_dict(reminder: Any) -> dict[str, Any]:
         "priority": priority,
         "creation_date": nsdate_to_datetime(reminder.creationDate()),
         "last_modified_date": nsdate_to_datetime(reminder.lastModifiedDate()),
+        "location": extract_location_from_reminder(reminder),
     }
 
 
@@ -198,3 +207,91 @@ def ek_calendar_to_dict(calendar: Any, is_default: bool = False) -> dict[str, An
 def str_to_nsurl(url_string: str) -> Any:
     """Convert string URL to NSURL."""
     return NSURL.URLWithString_(url_string)
+
+
+# Location/Alarm Conversions
+
+
+def location_trigger_to_ek_alarm(location: LocationTrigger) -> Any:
+    """Convert LocationTrigger to EKAlarm with structured location.
+
+    Creates an EKAlarm configured for location-based triggering:
+    - EKStructuredLocation with title and CLLocation (lat/lng/radius)
+    - Proximity setting (enter or leave)
+
+    Args:
+        location: LocationTrigger with lat/lng/radius/proximity
+
+    Returns:
+        EKAlarm configured for location-based notification
+    """
+    # Create CLLocation with coordinates
+    cl_location = CLLocation.alloc().initWithLatitude_longitude_(
+        location.latitude,
+        location.longitude,
+    )
+
+    # Create EKStructuredLocation
+    structured_location = EKStructuredLocation.locationWithTitle_(location.title)
+    structured_location.setGeoLocation_(cl_location)
+    structured_location.setRadius_(location.radius)
+
+    # Create alarm using alloc/init for location-only alarms
+    # (alarmWithAbsoluteDate_ requires a non-nil date)
+    alarm = EKAlarm.alloc().init()
+    alarm.setStructuredLocation_(structured_location)
+
+    # Set proximity (enter or leave)
+    if location.proximity == Proximity.LEAVE:
+        alarm.setProximity_(EKAlarmProximityLeave)
+    else:
+        alarm.setProximity_(EKAlarmProximityEnter)
+
+    return alarm
+
+
+def extract_location_from_reminder(reminder: Any) -> dict[str, Any] | None:
+    """Extract location alarm data from an EKReminder.
+
+    Searches through alarms for a location-based alarm and extracts
+    its structured location data.
+
+    Args:
+        reminder: EKReminder instance
+
+    Returns:
+        Dict with location fields or None if no location alarm exists
+    """
+    alarms = reminder.alarms()
+    if not alarms:
+        return None
+
+    for alarm in alarms:
+        structured_location = alarm.structuredLocation()
+        if structured_location is None:
+            continue
+
+        proximity = alarm.proximity()
+        if proximity == EKAlarmProximityNone:
+            continue
+
+        # Get geo coordinates
+        geo_location = structured_location.geoLocation()
+        if geo_location is None:
+            continue
+
+        title = structured_location.title()
+        radius = structured_location.radius()
+
+        # Map proximity constant to string
+        proximity_str = "leave" if proximity == EKAlarmProximityLeave else "enter"
+
+        return {
+            "title": str(title) if title else "Location",
+            "latitude": geo_location.coordinate().latitude,
+            "longitude": geo_location.coordinate().longitude,
+            "radius": float(radius) if radius > 0 else 100.0,
+            "proximity": proximity_str,
+        }
+
+    return None

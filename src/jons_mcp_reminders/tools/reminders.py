@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from ..models import Priority, Reminder
+from ..models import LocationTrigger, Priority, Reminder
 from ..store import ReminderStore
 
 
@@ -75,6 +75,7 @@ async def create_reminder(
     due_date: datetime | None = None,
     start_date: datetime | None = None,
     priority: Priority = Priority.NONE,
+    location: LocationTrigger | None = None,
 ) -> Reminder:
     """Create a new reminder.
 
@@ -86,6 +87,9 @@ async def create_reminder(
         due_date: Optional due date and time.
         start_date: Optional start date for the reminder.
         priority: Priority level (NONE=0, HIGH=1, MEDIUM=5, LOW=9).
+        location: Optional location trigger. When set, the reminder will fire when
+            entering or leaving the specified location. Provide title, latitude,
+            longitude, radius (meters), and proximity ("enter" or "leave").
 
     Returns:
         The newly created reminder.
@@ -103,6 +107,7 @@ async def create_reminder(
         due_date,
         start_date,
         int(priority),
+        location,
     )
     return Reminder(**data)
 
@@ -115,6 +120,8 @@ async def update_reminder(
     due_date: datetime | None = None,
     start_date: datetime | None = None,
     priority: Priority | None = None,
+    location: LocationTrigger | None = None,
+    clear_location: bool = False,
 ) -> Reminder:
     """Update an existing reminder.
 
@@ -128,6 +135,8 @@ async def update_reminder(
         due_date: New due date (optional).
         start_date: New start date (optional).
         priority: New priority level (optional).
+        location: New location trigger (optional). Replaces any existing location.
+        clear_location: Set to True to remove any existing location trigger.
 
     Returns:
         The updated reminder.
@@ -145,6 +154,8 @@ async def update_reminder(
         due_date,
         start_date,
         int(priority) if priority is not None else None,
+        location,
+        clear_location,
     )
     return Reminder(**data)
 
