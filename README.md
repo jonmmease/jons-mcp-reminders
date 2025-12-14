@@ -38,8 +38,30 @@ uv run jons-mcp-reminders
 
 ```bash
 # Register the MCP server with Claude Code
-claude mcp add jons-mcp-reminders -- uv run --directory /path/to/jons-mcp-reminders jons-mcp-reminders
+claude mcp add jons-mcp-reminders -- uv run --project /path/to/jons-mcp-reminders jons-mcp-reminders
 ```
+
+## Adding to Claude Desktop
+
+Add this to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "jons-mcp-reminders": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/path/to/jons-mcp-reminders",
+        "jons-mcp-reminders"
+      ]
+    }
+  }
+}
+```
+
+Replace `/path/to/jons-mcp-reminders` with the actual path to this repository.
 
 ## Available Tools
 
